@@ -1,112 +1,107 @@
-// ===============================
-// 📦 WhatsApp Bot de Ventas
-// Stack: Node.js + Baileys
-// ===============================
-
-// 👉 INSTALAR DEPENDENCIAS:
-// npm init -y
-// npm install @whiskeysockets/baileys dotenv fs
-
-// 👉 CREAR .env:
-// SELLER_NUMBER=549XXXXXXXXXX
-// ALIAS_PAGO=tu.alias.mp
-
+require('dotenv').config();
 const mongoose = require('mongoose');
+const qrcode = require('qrcode-terminal');
+const fs = require('fs');
+const makeWASocket = require('@whiskeysockets/baileys').default;
+const axios = require('axios');
 
+// ===============================
+// 🧠 MONGO (SESIONES)
+// ===============================
 mongoose.connect(process.env.MONGO_URI);
 
 const sessionSchema = new mongoose.Schema({
   _id: String,
-  data: Object
+  value: Object
 });
 
 const Session = mongoose.model('Session', sessionSchema);
 
-require('dotenv').config();
-const qrcode = require('qrcode-terminal');
-const fs = require('fs');
-const makeWASocket = require('@whiskeysockets/baileys').default;
-const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
-const axios = require('axios');
-
-async function obtenerCatalogoVapes() {
-  try {
-    const res = await axios.get(
-      'https://opensheet.elk.sh/1uMDtmMct7PBreGaLtG3V8EMeOJTpJgUyYj67Vox05zk/Vapers'
+// 👉 IMPLEMENTACIÓN CLAVE
+const useMongoAuthState = async () => {
+  const writeData = async (id, value) => {
+    await Session.findByIdAndUpdate(
+      id,
+      { value },
+      { upsert: true }
     );
+  };
 
-    return res.data
-    .filter(item => item.stock?.toLowerCase() === 'en stock')
-    .map((item, index) => ({
-        id: item.id || `V${index + 1}`,
-        nombre: item.nombre.trim(),
-        precio: Number(item.precio),
-        desc: item.descripcion || ''
+  const readData = async (id) => {
+    const data = await Session.findById(id);
+    return data?.value || null;
+  };
+
+  const removeData = async (id) => {
+    await Session.findByIdAndDelete(id);
+  };
+
+  return {
+    state: {
+      creds: (await readData('creds')) || {},
+      keys: {
+        get: async (type, ids) => {
+          const data = {};
+          for (let id of ids) {
+            const value = await readData(`${type}-${id}`);
+            if (value) data[id] = value;
+          }
+          return data;
+        },
+        set: async (data) => {
+          for (let category in data) {
+            for (let id in data[category]) {
+              const value = data[category][id];
+              const key = `${category}-${id}`;
+
+              if (value) await writeData(key, value);
+              else await removeData(key);
+            }
+          }
+        }
+      }
+    },
+    saveCreds: async () => {
+      await writeData('creds', state.creds);
+    }
+  };
+};
+
+// ===============================
+// 📦 CATÁLOGOS
+// ===============================
+async function obtenerCatalogoVapes() {
+  const res = await axios.get('https://opensheet.elk.sh/1uMDtmMct7PBreGaLtG3V8EMeOJTpJgUyYj67Vox05zk/Vapers');
+  return res.data
+    .filter(x => x.stock?.toLowerCase() === 'en stock')
+    .map((x, i) => ({
+      id: `V${i+1}`,
+      nombre: x.nombre.trim(),
+      precio: Number(x.precio)
     }));
-  } catch (error) {
-    console.error('Error cargando catálogo:', error);
-    return [];
-  }
 }
 
 async function obtenerCatalogoPerfumes() {
-  try {
-    const res = await axios.get(
-      'https://opensheet.elk.sh/1G3wiI8DPC_yZnnbrMgT-A2f_kVzpea_4VEOnLdZoX6k/perfumes'
-    );
-
-    return res.data
-      .filter(item => item.stock?.toLowerCase() === 'en stock')
-      .map((item, index) => ({
-        id: `P${index + 1}`,
-        nombre: `${item.marca} ${item.modelo}`,
-        precio: Number(item.precio),
-        desc: `${item.genero} - ${item.descripcion}`
-      }));
-
-  } catch (error) {
-    console.error('Error cargando perfumes:', error);
-    return [];
-  }
+  const res = await axios.get('https://opensheet.elk.sh/1G3wiI8DPC_yZnnbrMgT-A2f_kVzpea_4VEOnLdZoX6k/perfumes');
+  return res.data
+    .filter(x => x.stock?.toLowerCase() === 'en stock')
+    .map((x,i) => ({
+      id: `P${i+1}`,
+      nombre: `${x.marca} ${x.modelo}`,
+      precio: Number(x.precio)
+    }));
 }
 
 async function obtenerCatalogoSkincare() {
-  try {
-    const res = await axios.get(
-      'https://opensheet.elk.sh/1G3wiI8DPC_yZnnbrMgT-A2f_kVzpea_4VEOnLdZoX6k/skincare'
-    );
-
-    return res.data
-      .filter(item => item.stock?.toLowerCase() === 'en stock')
-      .map((item, index) => ({
-        id: `S${index + 1}`,
-        nombre: item.producto,
-        precio: Number(item.precio),
-        desc: `${item.tipo} | ${item.para_que} | ${item.destacado || ''}`
-      }));
-
-  } catch (error) {
-    console.error('Error cargando skincare:', error);
-    return [];
-  }
+  const res = await axios.get('https://opensheet.elk.sh/1G3wiI8DPC_yZnnbrMgT-A2f_kVzpea_4VEOnLdZoX6k/skincare');
+  return res.data
+    .filter(x => x.stock?.toLowerCase() === 'en stock')
+    .map((x,i) => ({
+      id: `S${i+1}`,
+      nombre: x.producto,
+      precio: Number(x.precio)
+    }));
 }
-// ===============================
-// 📦 CATÁLOGO
-// ===============================
-const catalogo = {
-  vapes: [
-    { id: 'V1', nombre: 'Vape Elfbar', precio: 15000, desc: '5000 puffs' },
-    { id: 'V2', nombre: 'Vape Ignite', precio: 18000, desc: '6000 puffs' }
-  ],
-  skincare: [
-    { id: 'S1', nombre: 'Serum Vitamina C', precio: 12000, desc: 'Coreano' },
-    { id: 'S2', nombre: 'Crema Snail', precio: 14000, desc: 'Hidratante' }
-  ],
-  perfumes: [
-    { id: 'P1', nombre: 'Perfume Oud', precio: 25000, desc: 'Árabe intenso' },
-    { id: 'P2', nombre: 'Perfume Musk', precio: 22000, desc: 'Dulce' }
-  ]
-};
 
 // ===============================
 // 🧠 ESTADOS
@@ -114,315 +109,143 @@ const catalogo = {
 const usuarios = {};
 
 // ===============================
-// 🚚 ENVÍO
-// ===============================
 function calcularEnvio(ciudad) {
-  if (ciudad.toLowerCase().includes('capital')) return 3000;
-  return 5000;
+  return ciudad.toLowerCase().includes('capital') ? 3000 : 5000;
 }
 
-// ===============================
-// 💾 GUARDAR ORDEN
-// ===============================
-function guardarOrden(orden) {
-  const data = fs.existsSync('ordenes.json')
-    ? JSON.parse(fs.readFileSync('ordenes.json'))
-    : [];
-
-  data.push(orden);
-  fs.writeFileSync('ordenes.json', JSON.stringify(data, null, 2));
-}
-
-// ===============================
-// 🚀 BOT
 // ===============================
 async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState('auth');
+  const { state, saveCreds } = await useMongoAuthState();
 
   const sock = makeWASocket({
     auth: state,
-    browser: ['Ubuntu', 'Chrome', '20.0.04'],
-    printQRInTerminal: true,
-    syncFullHistory: false,
-    markOnlineOnConnect: false,
-    });
-  sock.ev.on('connection.update', (update) => {
-    const { qr } = update;
-    if (qr) {
-        qrcode.generate(qr, { small: true });
+    printQRInTerminal: true
+  });
+
+  sock.ev.on('connection.update', ({ connection, qr }) => {
+    if (qr) qrcode.generate(qr, { small: true });
+
+    if (connection === 'close') {
+      console.log('🔄 Reconectando...');
+      startBot();
     }
-    });
+
+    if (connection === 'open') {
+      console.log('✅ Conectado');
+    }
+  });
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
-  if (type !== 'notify') return;
+  sock.ev.on('messages.upsert', async ({ messages }) => {
+    const msg = messages[0];
+    if (!msg.message || msg.key.fromMe) return;
 
-  const msg = messages[0];
-  if (!msg.message) return;
-  if (msg.key.fromMe) return;
+    const from = msg.key.remoteJid;
+    const texto = msg.message.conversation || msg.message.extendedTextMessage?.text;
+    if (!texto) return;
 
-  const from = msg.key.remoteJid;
-  const texto =
-    msg.message.conversation ||
-    msg.message.extendedTextMessage?.text;
+    const input = texto.toLowerCase().trim();
+    if (!usuarios[from]) usuarios[from] = { estado: 'inicio' };
 
-  if (!texto) return;
+    const user = usuarios[from];
 
-  const input = texto.toLowerCase().trim();
-  if (!usuarios[from]) usuarios[from] = { estado: 'inicio' };
+    try {
+      switch(user.estado) {
 
-// 🔄 REINICIAR
-  if (input === 'menu') {
-    usuarios[from] = { estado: 'inicio' };
-  }
+        case 'inicio':
+          user.estado = 'categoria';
+          return sock.sendMessage(from, {
+            text: `Hola 👋\n\n1. Vapes\n2. Skincare\n3. Perfumes`
+          });
 
-  const user = usuarios[from];
-  try {
-
-    if (user.procesando) return;
-    user.procesando = true;
-
-    switch (user.estado) {
-
-    case 'inicio':
-        user.estado = 'categoria';
-        await sock.sendMessage(from, {
-          text: 'Hola! 👋 Bienvenido/a. ¿Qué estás buscando?\n\n1. Vapes\n2. Skincare coreano\n3. Perfumes árabes'
-        });
-        break;
-
-    case 'categoria':
-
-        if (input === '1' || input.includes('vape')) {
-            user.cat = 'vapes';
+        case 'categoria':
+          if (input === '1') {
             user.catalogoActual = await obtenerCatalogoVapes();
-            await sock.sendMessage(from, {
-            text: `💨 Catálogo de Vapes:
-        https://docs.google.com/spreadsheets/d/1uMDtmMct7PBreGaLtG3V8EMeOJTpJgUyYj67Vox05zk
-
-        👉 Escribí el nombre del modelo que te gustó
-        👉 O escribí "menu" para ver otras categorías`
+            user.estado = 'producto';
+            return sock.sendMessage(from, {
+              text: `💨 Catálogo:\nhttps://docs.google.com/spreadsheets/d/1uMD...\n\nEscribí el modelo`
             });
+          }
 
-        } 
-        else if (input === '2' || input.includes('skin')) {
-            user.cat = 'skincare';
+          if (input === '2') {
             user.catalogoActual = await obtenerCatalogoSkincare();
-
-            await sock.sendMessage(from, {
-            text: `🧴 Catálogo Skincare:
-        https://docs.google.com/spreadsheets/d/1G3wiI8DPC_yZnnbrMgT-A2f_kVzpea_4VEOnLdZoX6k/edit?gid=2060260992#gid=2060260992
-
-        👉 Escribí el nombre del producto que te gustó
-        👉 O escribí "menu" para ver otras categorías`
+            user.estado = 'producto';
+            return sock.sendMessage(from, {
+              text: `🧴 Catálogo:\nhttps://docs.google.com/spreadsheets/d/1G3wi...\n\nEscribí el producto`
             });
+          }
 
-        } 
-        else if (input === '3' || input.includes('perfume')) {
-            user.cat = 'perfumes';
+          if (input === '3') {
             user.catalogoActual = await obtenerCatalogoPerfumes();
-
-            await sock.sendMessage(from, {
-            text: `🌸 Catálogo Perfumes:
-        https://docs.google.com/spreadsheets/d/1G3wiI8DPC_yZnnbrMgT-A2f_kVzpea_4VEOnLdZoX6k/edit?gid=0#gid=0
-        👉 Escribí el modelo que te gustó (ej: Yara Pink, Khamrah)
-        👉 O escribí "menu" para volver`
+            user.estado = 'producto';
+            return sock.sendMessage(from, {
+              text: `🌸 Catálogo:\nhttps://docs.google.com/spreadsheets/d/1G3wi...\n\nEscribí el modelo`
             });
+          }
 
-        } 
-        else {
-            await sock.sendMessage(from, { text: 'Elegí una opción válida.' });
-            return;
-        }
+          return sock.sendMessage(from, { text: 'Elegí 1, 2 o 3' });
 
-        // 🔥 IMPORTANTE: ahora pasa a estado producto
-        user.estado = 'producto';
-        break;
-
-
-    case 'producto':
-        if (!user.catalogoActual) {
-            await sock.sendMessage(from, {
-                text: 'Error cargando productos. Escribí "menu" para reiniciar.'
-            });
+        case 'producto':
+          if (!user.catalogoActual) {
             user.estado = 'inicio';
-            return;
-        }
+            return sock.sendMessage(from, { text: 'Error. Escribí menu' });
+          }
 
+          const prod = user.catalogoActual.find(p =>
+            p.nombre.toLowerCase().includes(input)
+          );
 
-
-        const prod = user.catalogoActual.find(p =>
-            p.nombre.toLowerCase().includes(input) ||
-            input.split(' ').some(word => p.nombre.toLowerCase().includes(word))
-        );
-
-        if (input === 'menu') {
-            user.estado = 'inicio';
-            return await sock.sendMessage(from, {
-                text: 'Volviendo al menú...'
+          if (!prod) {
+            return sock.sendMessage(from, {
+              text: 'No encontré ese modelo. Probá de nuevo.'
             });
-        }
-        if (input.includes('asesor') || input.includes('humano')) {
-            await sock.sendMessage(from, {
-                text: 'En breve te atiende una persona 😊'
-            });
+          }
 
-            await sock.sendMessage(
-                process.env.SELLER_NUMBER + '@s.whatsapp.net',
-                {
-                text: `📲 Cliente solicita atención humana: ${from}`
-                }
-            );
+          user.producto = prod;
+          user.estado = 'cantidad';
 
-            return;
-            }
+          return sock.sendMessage(from, {
+            text: `${prod.nombre} - $${prod.precio}\n\nCantidad?`
+          });
 
-       if (!prod) {
-        const sugerencias = user.catalogoActual
-            .filter(p => p.nombre.toLowerCase().includes(input.slice(0, 3)))
-            .slice(0, 3)
-            .map(p => `• ${p.nombre}`)
-            .join('\n');
+        case 'cantidad':
+          user.cantidad = parseInt(input);
+          user.estado = 'nombre';
+          return sock.sendMessage(from, { text: 'Nombre:' });
 
-        await sock.sendMessage(from, { 
-            text: `❌ No encontré ese modelo.\n\nQuizás quisiste decir:\n${sugerencias || 'Probá con otro nombre'}` 
-        });
-        return;
-        }
+        case 'nombre':
+          user.nombre = texto;
+          user.estado = 'direccion';
+          return sock.sendMessage(from, { text: 'Dirección:' });
 
-        user.producto = prod;
-        user.estado = 'cantidad';
+        case 'direccion':
+          user.direccion = texto;
+          user.estado = 'ciudad';
+          return sock.sendMessage(from, { text: 'Ciudad:' });
 
-        await sock.sendMessage(from, {
-            text: `✨ Elegiste: ${prod.nombre}\n💰 Precio: $${prod.precio}\n\n¿Cuántas unidades querés?`
-        });
+        case 'ciudad':
+          user.ciudad = texto;
+          user.envio = calcularEnvio(texto);
+          user.estado = 'pago';
 
-        break;
+          const total = user.producto.precio * user.cantidad + user.envio;
 
-      case 'cantidad':
-        const cantidad = parseInt(input);
-
-        if (isNaN(cantidad) || cantidad <= 0 || cantidad > 10) {
-            await sock.sendMessage(from, { 
-                text: 'Ingresá una cantidad válida (1 a 10).' 
-            });
-            return;
-            }
-
-        user.cantidad = cantidad;
-        user.estado = 'nombre';
-
-        await sock.sendMessage(from, { text: 'Nombre completo:' });
-        break;
-
-      case 'nombre':
-        user.nombre = texto;
-        user.estado = 'direccion';
-        await sock.sendMessage(from, { text: 'Dirección:' });
-        break;
-
-      case 'direccion':
-        user.direccion = texto;
-        user.estado = 'ciudad';
-        await sock.sendMessage(from, { text: 'Ciudad:' });
-        break;
-
-      case 'ciudad':
-        user.ciudad = texto;
-        user.envio = calcularEnvio(texto);
-        user.estado = 'cp';
-        await sock.sendMessage(from, { text: 'Código postal:' });
-        break;
-
-      case 'cp':
-        user.cp = texto;
-
-        const totalProd = user.producto.precio * user.cantidad;
-        const totalFinal = totalProd + user.envio;
-
-        user.total = totalFinal;
-        user.estado = 'pago';
-
-        await sock.sendMessage(from, {
-          text: `Resumen:\nProducto: ${user.producto.nombre}\nCantidad: ${user.cantidad}\nSubtotal: $${totalProd}\nEnvío: $${user.envio}\nTotal: $${totalFinal}\n\nPagá a alias: ${process.env.ALIAS_PAGO}\nLuego escribí: He pagado`
-        });
-        break;
+          return sock.sendMessage(from, {
+            text: `Total: $${total}\nAlias: ${process.env.ALIAS_PAGO}\n\nEscribí "pagado"`
+          });
 
         case 'pago':
-        if (!input.includes('pag')) {
-            await sock.sendMessage(from, {
-            text: 'Cuando pagues escribí "He pagado"'
-            });
-            return;
-        }
+          return sock.sendMessage(from, {
+            text: '✅ Pedido confirmado!'
+          });
+      }
 
-        const orden = {
-            cliente: user.nombre,
-            direccion: user.direccion,
-            ciudad: user.ciudad,
-            cp: user.cp,
-            producto: user.producto.nombre,
-            cantidad: user.cantidad,
-            total: user.total
-        };
-
-        // 💾 guardar en archivo
-        guardarOrden(orden);
-
-        // 📲 MENSAJE PARA VOS (VENDEDORA)
-        await sock.sendMessage(
-            process.env.SELLER_NUMBER + '@s.whatsapp.net',
-            {
-            text:
-                `🛒 NUEVA VENTA\n\n` +
-                `👤 Cliente: ${orden.cliente}\n` +
-                `📦 Producto: ${orden.producto}\n` +
-                `🔢 Cantidad: ${orden.cantidad}\n` +
-                `💰 Total: $${orden.total}\n\n` +
-                `📍 Dirección: ${orden.direccion}\n` +
-                `🏙 Ciudad: ${orden.ciudad}\n` +
-                `📮 CP: ${orden.cp}`
-            }
-        );
-
-        // ✅ RESPUESTA AL CLIENTE
-        await sock.sendMessage(from, {
-            text: '✅ Pedido confirmado! Gracias por tu compra.'
-        });
-
-        usuarios[from] = { estado: 'inicio' };
-        break;
+    } catch(err) {
+      console.error(err);
+      sock.sendMessage(from, { text: 'Error. Escribí menu' });
     }
-  } catch (err) {
-    console.error(err);
-    await sock.sendMessage(from, {
-      text: 'Error. Escribí "menu" para reiniciar.'
-    });
-  }finally {
-  user.procesando = false;
-}
-});
+  });
 }
 
 startBot();
-
-// ===============================
-// 📘 INSTRUCCIONES
-// ===============================
-// 1. node index.js
-// 2. Escanear QR
-// 3. Listo!
-
-// ===============================
-// ✏️ EDITAR PRECIOS
-// ===============================
-// Modificar valores en objeto "catalogo"
-
-// ===============================
-// 💡 SIGUIENTES MEJORAS
-// ===============================
-// - Integrar MercadoPago
-// - Usar MongoDB
-// - Botones interactivos
-// ===============================
