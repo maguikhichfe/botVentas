@@ -7,10 +7,13 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 
 // 🔌 Conexión Mongo (solo para futuro / órdenes si querés)
-mongoose.connect(process.env.MONGO_URI || '', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
+if (process.env.MONGO_URI) {
+  mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('✅ Mongo conectado'))
+    .catch(err => console.error('❌ Error Mongo:', err));
+} else {
+  console.log('⚠️ Mongo no configurado');
+}
 .then(() => console.log('✅ Mongo conectado'))
 .catch(() => console.log('⚠️ Mongo no configurado (no pasa nada)'));
 
@@ -108,20 +111,31 @@ function guardarOrden(orden) {
 // 🚀 BOT
 // ===============================
 async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState('./auth');
+  const { state, saveCreds } = await useMultiFileAuthState('/app/auth');
 
   const sock = makeWASocket({
     auth: state,
 
   });
 
-  sock.ev.on('connection.update', ({ connection, qr }) => {
+  const { DisconnectReason } = require('@whiskeysockets/baileys');
+  
+  sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
     if (qr) qrcode.generate(qr, { small: true });
-
-    if (connection === 'open') console.log('✅ Bot conectado');
+  
+    if (connection === 'open') {
+      console.log('✅ Bot conectado');
+    }
+  
     if (connection === 'close') {
-      console.log('🔄 Reconectando...');
-      startBot();
+      const reason = lastDisconnect?.error?.output?.statusCode;
+  
+      if (reason !== DisconnectReason.loggedOut) {
+        console.log('🔄 Reconectando...');
+        startBot();
+      } else {
+        console.log('❌ Sesión cerrada. Necesitás escanear QR de nuevo');
+      }
     }
   });
 
@@ -183,12 +197,19 @@ https://docs.google.com/
           if (!user.catalogoActual) return;
 
           const prod = user.catalogoActual.find(p =>
-            p.nombre.toLowerCase().includes(input)
-          );
+              p.nombre.toLowerCase().includes(input) ||
+              input.split(' ').some(word => p.nombre.toLowerCase().includes(word))
+            );
 
-          if (!prod) {
+         if (!prod) {
+            const sugerencias = user.catalogoActual
+              .filter(p => p.nombre.toLowerCase().includes(input.slice(0, 3)))
+              .slice(0, 3)
+              .map(p => `• ${p.nombre}`)
+              .join('\n');
+          
             return sock.sendMessage(from, {
-              text: '❌ No encontrado, probá otro nombre'
+              text: `❌ No encontré ese producto.\n\n${sugerencias ? 'Quizás quisiste decir:\n' + sugerencias : 'Probá con otro nombre o escribí "menu"'}`
             });
           }
 
