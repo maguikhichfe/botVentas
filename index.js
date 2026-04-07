@@ -8,11 +8,13 @@ const axios = require('axios');
 // ===============================
 // 🧠 MONGO (SESIONES)
 // ===============================
-mongoose.connect(process.env.MONGO_URI);
-
-const sessionSchema = new mongoose.Schema({
-  _id: String,
-  value: Object
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => console.log('✅ Mongo conectado'))
+.catch(err => {
+  console.error('❌ Error Mongo:', err);
 });
 
 const Session = mongoose.model('Session', sessionSchema);
@@ -115,7 +117,8 @@ function calcularEnvio(ciudad) {
 
 // ===============================
 async function startBot() {
-  const { state, saveCreds } = await useMongoAuthState();
+  const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
+  const { state, saveCreds } = await useMultiFileAuthState('./auth');
 
   const sock = makeWASocket({
     auth: state,
