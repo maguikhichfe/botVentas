@@ -112,7 +112,7 @@ async function startBot() {
 
   const sock = makeWASocket({
     auth: state,
-    printQRInTerminal: true
+
   });
 
   sock.ev.on('connection.update', ({ connection, qr }) => {
