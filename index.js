@@ -14,8 +14,6 @@ if (process.env.MONGO_URI) {
 } else {
   console.log('⚠️ Mongo no configurado');
 }
-.then(() => console.log('✅ Mongo conectado'))
-.catch(() => console.log('⚠️ Mongo no configurado (no pasa nada)'));
 
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
