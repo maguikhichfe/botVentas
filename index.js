@@ -1,109 +1,83 @@
+// ===============================
+// 📦 WhatsApp Bot de Ventas
+// ===============================
+
 require('dotenv').config();
+
 const mongoose = require('mongoose');
 
-
-// ===============================
-// 🧠 MONGO (SESIONES)
-// ===============================
-mongoose.connect(process.env.MONGO_URI, {
+// 🔌 Conexión Mongo (solo para futuro / órdenes si querés)
+mongoose.connect(process.env.MONGO_URI || '', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
 .then(() => console.log('✅ Mongo conectado'))
-.catch(err => {
-  console.error('❌ Error Mongo:', err);
-});
+.catch(() => console.log('⚠️ Mongo no configurado (no pasa nada)'));
+
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const makeWASocket = require('@whiskeysockets/baileys').default;
+const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const axios = require('axios');
 
-const Session = mongoose.model('Session', sessionSchema);
-
-// 👉 IMPLEMENTACIÓN CLAVE
-const useMongoAuthState = async () => {
-  const writeData = async (id, value) => {
-    await Session.findByIdAndUpdate(
-      id,
-      { value },
-      { upsert: true }
-    );
-  };
-
-  const readData = async (id) => {
-    const data = await Session.findById(id);
-    return data?.value || null;
-  };
-
-  const removeData = async (id) => {
-    await Session.findByIdAndDelete(id);
-  };
-
-  return {
-    state: {
-      creds: (await readData('creds')) || {},
-      keys: {
-        get: async (type, ids) => {
-          const data = {};
-          for (let id of ids) {
-            const value = await readData(`${type}-${id}`);
-            if (value) data[id] = value;
-          }
-          return data;
-        },
-        set: async (data) => {
-          for (let category in data) {
-            for (let id in data[category]) {
-              const value = data[category][id];
-              const key = `${category}-${id}`;
-
-              if (value) await writeData(key, value);
-              else await removeData(key);
-            }
-          }
-        }
-      }
-    },
-    saveCreds: async () => {
-      await writeData('creds', state.creds);
-    }
-  };
-};
-
 // ===============================
-// 📦 CATÁLOGOS
+// 📦 CATÁLOGOS (API)
 // ===============================
 async function obtenerCatalogoVapes() {
-  const res = await axios.get('https://opensheet.elk.sh/1uMDtmMct7PBreGaLtG3V8EMeOJTpJgUyYj67Vox05zk/Vapers');
-  return res.data
-    .filter(x => x.stock?.toLowerCase() === 'en stock')
-    .map((x, i) => ({
-      id: `V${i+1}`,
-      nombre: x.nombre.trim(),
-      precio: Number(x.precio)
-    }));
+  try {
+    const res = await axios.get(
+      'https://opensheet.elk.sh/1uMDtmMct7PBreGaLtG3V8EMeOJTpJgUyYj67Vox05zk/Vapers'
+    );
+
+    return res.data
+      .filter(i => i.stock?.toLowerCase() === 'en stock')
+      .map((item, i) => ({
+        id: item.id || `V${i + 1}`,
+        nombre: item.nombre.trim(),
+        precio: Number(item.precio),
+        desc: item.descripcion || ''
+      }));
+  } catch {
+    return [];
+  }
 }
 
 async function obtenerCatalogoPerfumes() {
-  const res = await axios.get('https://opensheet.elk.sh/1G3wiI8DPC_yZnnbrMgT-A2f_kVzpea_4VEOnLdZoX6k/perfumes');
-  return res.data
-    .filter(x => x.stock?.toLowerCase() === 'en stock')
-    .map((x,i) => ({
-      id: `P${i+1}`,
-      nombre: `${x.marca} ${x.modelo}`,
-      precio: Number(x.precio)
-    }));
+  try {
+    const res = await axios.get(
+      'https://opensheet.elk.sh/1G3wiI8DPC_yZnnbrMgT-A2f_kVzpea_4VEOnLdZoX6k/perfumes'
+    );
+
+    return res.data
+      .filter(i => i.stock?.toLowerCase() === 'en stock')
+      .map((item, i) => ({
+        id: `P${i + 1}`,
+        nombre: `${item.marca} ${item.modelo}`,
+        precio: Number(item.precio),
+        desc: `${item.genero} - ${item.descripcion}`
+      }));
+  } catch {
+    return [];
+  }
 }
 
 async function obtenerCatalogoSkincare() {
-  const res = await axios.get('https://opensheet.elk.sh/1G3wiI8DPC_yZnnbrMgT-A2f_kVzpea_4VEOnLdZoX6k/skincare');
-  return res.data
-    .filter(x => x.stock?.toLowerCase() === 'en stock')
-    .map((x,i) => ({
-      id: `S${i+1}`,
-      nombre: x.producto,
-      precio: Number(x.precio)
-    }));
+  try {
+    const res = await axios.get(
+      'https://opensheet.elk.sh/1G3wiI8DPC_yZnnbrMgT-A2f_kVzpea_4VEOnLdZoX6k/skincare'
+    );
+
+    return res.data
+      .filter(i => i.stock?.toLowerCase() === 'en stock')
+      .map((item, i) => ({
+        id: `S${i + 1}`,
+        nombre: item.producto,
+        precio: Number(item.precio),
+        desc: `${item.tipo} | ${item.para_que}`
+      }));
+  } catch {
+    return [];
+  }
 }
 
 // ===============================
@@ -112,13 +86,28 @@ async function obtenerCatalogoSkincare() {
 const usuarios = {};
 
 // ===============================
+// 🚚 ENVÍO
+// ===============================
 function calcularEnvio(ciudad) {
   return ciudad.toLowerCase().includes('capital') ? 3000 : 5000;
 }
 
 // ===============================
+// 💾 GUARDAR ORDEN
+// ===============================
+function guardarOrden(orden) {
+  const data = fs.existsSync('ordenes.json')
+    ? JSON.parse(fs.readFileSync('ordenes.json'))
+    : [];
+
+  data.push(orden);
+  fs.writeFileSync('ordenes.json', JSON.stringify(data, null, 2));
+}
+
+// ===============================
+// 🚀 BOT
+// ===============================
 async function startBot() {
-  const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
   const { state, saveCreds } = await useMultiFileAuthState('./auth');
 
   const sock = makeWASocket({
@@ -129,72 +118,69 @@ async function startBot() {
   sock.ev.on('connection.update', ({ connection, qr }) => {
     if (qr) qrcode.generate(qr, { small: true });
 
+    if (connection === 'open') console.log('✅ Bot conectado');
     if (connection === 'close') {
       console.log('🔄 Reconectando...');
       startBot();
-    }
-
-    if (connection === 'open') {
-      console.log('✅ Conectado');
     }
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('messages.upsert', async ({ messages }) => {
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
+
     const msg = messages[0];
     if (!msg.message || msg.key.fromMe) return;
 
     const from = msg.key.remoteJid;
-    const texto = msg.message.conversation || msg.message.extendedTextMessage?.text;
+    const texto =
+      msg.message.conversation ||
+      msg.message.extendedTextMessage?.text;
+
     if (!texto) return;
 
     const input = texto.toLowerCase().trim();
     if (!usuarios[from]) usuarios[from] = { estado: 'inicio' };
 
+    if (input === 'menu') usuarios[from] = { estado: 'inicio' };
+
     const user = usuarios[from];
 
     try {
-      switch(user.estado) {
+      switch (user.estado) {
 
         case 'inicio':
           user.estado = 'categoria';
-          return sock.sendMessage(from, {
-            text: `Hola 👋\n\n1. Vapes\n2. Skincare\n3. Perfumes`
+          await sock.sendMessage(from, {
+            text: 'Hola 👋\n\n1. Vapes\n2. Skincare\n3. Perfumes'
           });
+          break;
 
         case 'categoria':
           if (input === '1') {
             user.catalogoActual = await obtenerCatalogoVapes();
-            user.estado = 'producto';
-            return sock.sendMessage(from, {
-              text: `💨 Catálogo:\nhttps://docs.google.com/spreadsheets/d/1uMD...\n\nEscribí el modelo`
-            });
-          }
-
-          if (input === '2') {
+          } else if (input === '2') {
             user.catalogoActual = await obtenerCatalogoSkincare();
-            user.estado = 'producto';
-            return sock.sendMessage(from, {
-              text: `🧴 Catálogo:\nhttps://docs.google.com/spreadsheets/d/1G3wi...\n\nEscribí el producto`
-            });
-          }
-
-          if (input === '3') {
+          } else if (input === '3') {
             user.catalogoActual = await obtenerCatalogoPerfumes();
-            user.estado = 'producto';
-            return sock.sendMessage(from, {
-              text: `🌸 Catálogo:\nhttps://docs.google.com/spreadsheets/d/1G3wi...\n\nEscribí el modelo`
-            });
+          } else {
+            return sock.sendMessage(from, { text: 'Elegí 1, 2 o 3' });
           }
 
-          return sock.sendMessage(from, { text: 'Elegí 1, 2 o 3' });
+          user.estado = 'producto';
+
+          await sock.sendMessage(from, {
+            text: `📦 Catálogo:
+https://docs.google.com/
+
+👉 Escribí el nombre del producto
+👉 o "menu" para volver`
+          });
+          break;
 
         case 'producto':
-          if (!user.catalogoActual) {
-            user.estado = 'inicio';
-            return sock.sendMessage(from, { text: 'Error. Escribí menu' });
-          }
+          if (!user.catalogoActual) return;
 
           const prod = user.catalogoActual.find(p =>
             p.nombre.toLowerCase().includes(input)
@@ -202,31 +188,39 @@ async function startBot() {
 
           if (!prod) {
             return sock.sendMessage(from, {
-              text: 'No encontré ese modelo. Probá de nuevo.'
+              text: '❌ No encontrado, probá otro nombre'
             });
           }
 
           user.producto = prod;
           user.estado = 'cantidad';
 
-          return sock.sendMessage(from, {
-            text: `${prod.nombre} - $${prod.precio}\n\nCantidad?`
+          await sock.sendMessage(from, {
+            text: `Elegiste ${prod.nombre}\nPrecio: $${prod.precio}\n\nCantidad?`
           });
+          break;
 
         case 'cantidad':
-          user.cantidad = parseInt(input);
+          const cant = parseInt(input);
+          if (!cant) return;
+
+          user.cantidad = cant;
           user.estado = 'nombre';
-          return sock.sendMessage(from, { text: 'Nombre:' });
+
+          await sock.sendMessage(from, { text: 'Nombre:' });
+          break;
 
         case 'nombre':
           user.nombre = texto;
           user.estado = 'direccion';
-          return sock.sendMessage(from, { text: 'Dirección:' });
+          await sock.sendMessage(from, { text: 'Dirección:' });
+          break;
 
         case 'direccion':
           user.direccion = texto;
           user.estado = 'ciudad';
-          return sock.sendMessage(from, { text: 'Ciudad:' });
+          await sock.sendMessage(from, { text: 'Ciudad:' });
+          break;
 
         case 'ciudad':
           user.ciudad = texto;
@@ -235,19 +229,26 @@ async function startBot() {
 
           const total = user.producto.precio * user.cantidad + user.envio;
 
-          return sock.sendMessage(from, {
-            text: `Total: $${total}\nAlias: ${process.env.ALIAS_PAGO}\n\nEscribí "pagado"`
+          await sock.sendMessage(from, {
+            text: `Total: $${total}\n\nAlias: ${process.env.ALIAS_PAGO}\n\nEscribí "pagado"`
           });
+          break;
 
         case 'pago':
-          return sock.sendMessage(from, {
+          if (!input.includes('pag')) return;
+
+          guardarOrden(user);
+
+          await sock.sendMessage(from, {
             text: '✅ Pedido confirmado!'
           });
+
+          usuarios[from] = { estado: 'inicio' };
+          break;
       }
 
-    } catch(err) {
+    } catch (err) {
       console.error(err);
-      sock.sendMessage(from, { text: 'Error. Escribí menu' });
     }
   });
 }
