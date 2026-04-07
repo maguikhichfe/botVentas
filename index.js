@@ -1,9 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const qrcode = require('qrcode-terminal');
-const fs = require('fs');
-const makeWASocket = require('@whiskeysockets/baileys').default;
-const axios = require('axios');
+
 
 // ===============================
 // 🧠 MONGO (SESIONES)
@@ -16,6 +13,10 @@ mongoose.connect(process.env.MONGO_URI, {
 .catch(err => {
   console.error('❌ Error Mongo:', err);
 });
+const qrcode = require('qrcode-terminal');
+const fs = require('fs');
+const makeWASocket = require('@whiskeysockets/baileys').default;
+const axios = require('axios');
 
 const Session = mongoose.model('Session', sessionSchema);
 
