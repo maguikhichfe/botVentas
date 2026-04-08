@@ -153,6 +153,7 @@ async function conectar() {
   const sock = makeWASocket({
     auth: state
   })
+}
 
   sock.ev.on('creds.update', saveCreds)
 
