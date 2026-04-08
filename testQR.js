@@ -16,7 +16,10 @@ async function start() {
       qrcode.generate(update.qr, { small: true });
     }
     if (update.connection === 'open') {
-      console.log('✅ Conectado!');
+      console.log('✅ Conectado a WhatsApp!');
+    }
+    if (update.connection === 'close') {
+      console.log('❌ Conexión cerrada:', update.lastDisconnect?.error || '');
     }
   });
 
