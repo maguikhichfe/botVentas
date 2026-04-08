@@ -3,7 +3,7 @@
 // Stack: Node.js + Baileys
 // ===============================
 import qrcode from "qrcode-terminal"
-require('dotenv').config();
+import 'dotenv/config'
 const fs = require('fs');
 
 console.log('📁 auth existe:', fs.existsSync('./auth'));
