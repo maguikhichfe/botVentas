@@ -1,31 +1,28 @@
-// ===============================
-// 🟢 Test QR WhatsApp
-// ===============================
-console.log('🚀 Ejecutando testQR.js');
+// testQR.js
 const qrcode = require('qrcode-terminal');
 const makeWASocket = require('@whiskeysockets/baileys').default;
+const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
 
-// Forzamos NO usar credenciales guardadas para que genere QR siempre
 async function startTestQR() {
+  const { state, saveCreds } = await useMultiFileAuthState('auth');
+
   const sock = makeWASocket({
-    printQRInTerminal: true,
-    browser: ['Test', 'Chrome', '1.0']
+    auth: state,
+    browser: ['Ubuntu', 'Chrome', '20.0.04'],
+    printQRInTerminal: true
   });
 
   sock.ev.on('connection.update', (update) => {
-    console.log('🟢 Evento connection.update:', update);
-
-    const { qr, connection } = update;
-
-    if (qr) {
-      console.log('🔹 Generando QR...');
-      qrcode.generate(qr, { small: true });
+    if (update.qr) {
+      console.log('📲 QR generado:');
+      qrcode.generate(update.qr, { small: true });
     }
-
-    if (connection === 'open') {
-      console.log('✅ Conectado a WhatsApp!');
+    if (update.connection) {
+      console.log('🔗 Conexión:', update.connection);
     }
   });
+
+  sock.ev.on('creds.update', saveCreds);
 }
 
-startTestQR();
+startTestQR().catch(err => console.error(err));
