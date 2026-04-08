@@ -163,6 +163,7 @@ async function startBot() {
 
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
+    console.log("📡 Estado conexión:", update)
   
     if (qr) {
       console.log('📲 Escaneá este QR:');
