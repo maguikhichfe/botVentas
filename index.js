@@ -1,68 +1,22 @@
-import express from "express";
+import fetch from 'node-fetch';
 
-const app = express();
-app.use(express.urlencoded({ extended: false }));
+const token = 'TU_TOKEN';
+const phoneId = 'TU_PHONE_ID';
+const recipient = '5491123456789'; // número con código de país
+const message = 'Hola desde tu VPS!';
 
-const usuarios = {};
-
-// ===============================
-// 📩 WEBHOOK TWILIO
-// ===============================
-app.post("/webhook", (req, res) => {
-  const mensaje = req.body.Body.toLowerCase().trim();
-  const numero = req.body.From;
-
-  if (!usuarios[numero]) {
-    usuarios[numero] = { estado: "inicio" };
-  }
-
-  const user = usuarios[numero];
-
-  let respuesta = "";
-
-  switch (user.estado) {
-    case "inicio":
-      user.estado = "categoria";
-      respuesta = "👋 Hola!\n\n1️⃣ Vapes\n2️⃣ Perfumes";
-      break;
-
-    case "categoria":
-      if (mensaje === "1") {
-        user.cat = "vapes";
-      } else if (mensaje === "2") {
-        user.cat = "perfumes";
-      } else {
-        respuesta = "Elegí 1 o 2";
-        break;
-      }
-
-      user.estado = "producto";
-      respuesta = "Escribí el producto";
-      break;
-
-    case "producto":
-      user.producto = mensaje;
-      user.estado = "pago";
-      respuesta = "💰 Pagá y escribí 'pagado'";
-      break;
-
-    case "pago":
-      if (!mensaje.includes("pag")) {
-        respuesta = "Escribí 'pagado'";
-        break;
-      }
-
-      respuesta = "✅ Pedido confirmado!";
-      delete usuarios[numero];
-      break;
-  }
-
-  const twiml = new twilio.twiml.MessagingResponse();
-  twiml.message(respuesta);
-
-  res.writeHead(200, { "Content-Type": "text/xml" });
-  res.end(twiml.toString());
+const res = await fetch(`https://graph.facebook.com/v17.0/${phoneId}/messages`, {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    messaging_product: "whatsapp",
+    to: recipient,
+    text: { body: message }
+  })
 });
 
-// ===============================
-app.listen(3000, () => console.log("🚀 Server listo"));
+const data = await res.json();
+console.log(data);
