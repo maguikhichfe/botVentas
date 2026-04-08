@@ -1,6 +1,7 @@
 // ===============================
 // 🟢 Test QR WhatsApp
 // ===============================
+console.log('🚀 Ejecutando testQR.js');
 const qrcode = require('qrcode-terminal');
 const makeWASocket = require('@whiskeysockets/baileys').default;
 
