@@ -1,21 +1,26 @@
 const makeWASocket = require('@whiskeysockets/baileys').default;
-const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const { useSingleFileAuthState } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 
-async function test() {
-  const { state, saveCreds } = await useMultiFileAuthState('auth_test');
+const { state, saveCreds } = useSingleFileAuthState('auth_test.json');
+
+async function start() {
   const sock = makeWASocket({
     auth: state,
-    printQRInTerminal: true
+    printQRInTerminal: false
   });
 
   sock.ev.on('connection.update', (update) => {
-    const { qr, connection } = update;
-    if (qr) qrcode.generate(qr, { small: true });
-    if (connection === 'open') console.log('✅ Conectado');
+    if (update.qr) {
+      console.log('🔹 Escaneá este QR con WhatsApp:');
+      qrcode.generate(update.qr, { small: true });
+    }
+    if (update.connection === 'open') {
+      console.log('✅ Conectado!');
+    }
   });
 
   sock.ev.on('creds.update', saveCreds);
 }
 
-test();
+start();
