@@ -155,7 +155,7 @@ async function conectar() {
   })
 }
 
-  sock.ev.on('creds.update', saveCreds)
+ 
 
   sock.ev.on('connection.update', (update) => {
     const { qr } = update
@@ -180,7 +180,7 @@ async function startBot() {
     syncFullHistory: false,
     markOnlineOnConnect: false
   });
-
+  sock.ev.on('creds.update', saveCreds);
   sock.ev.on("connection.update", ({ connection, qr }) => {
     if (qr) {
       console.log("📱 ESCANEÁ ESTE QR:")
