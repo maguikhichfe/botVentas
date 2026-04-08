@@ -1,6 +1,7 @@
 // ===============================
 // Test QR WhatsApp con Baileys
 // ===============================
+console.log('🟢 testQR.js cargado correctamente');
 
 const makeWASocket = require('@whiskeysockets/baileys').default;
 const { useSingleFileAuthState } = require('@whiskeysockets/baileys');
