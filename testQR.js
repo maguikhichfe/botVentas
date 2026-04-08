@@ -1,48 +1,30 @@
 // ===============================
-// Test QR WhatsApp con Baileys
+// 🟢 Test QR WhatsApp
 // ===============================
-console.log('🟢 testQR.js cargado correctamente');
-
-const makeWASocket = require('@whiskeysockets/baileys').default;
-const { useSingleFileAuthState } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
-const fs = require('fs');
-const { toFile } = require('qrcode');
+const makeWASocket = require('@whiskeysockets/baileys').default;
 
-// Archivo de sesión
-const { state, saveCreds } = useSingleFileAuthState('auth_test.json');
-
-async function start() {
+// Forzamos NO usar credenciales guardadas para que genere QR siempre
+async function startTestQR() {
   const sock = makeWASocket({
-    auth: state,
-    printQRInTerminal: false // vamos a manejar QR manual
+    printQRInTerminal: true,
+    browser: ['Test', 'Chrome', '1.0']
   });
 
-  sock.ev.on('connection.update', async (update) => {
-    if (update.qr) {
-      // 🔹 Mostrar QR en terminal
-      console.log('🔹 Escaneá este QR con WhatsApp:');
-      qrcode.generate(update.qr, { small: true });
+  sock.ev.on('connection.update', (update) => {
+    console.log('🟢 Evento connection.update:', update);
 
-      // 🔹 Guardar QR en PNG
-      try {
-        await toFile('qr.png', update.qr);
-        console.log('📌 QR guardado en qr.png, abrilo con tu computadora o celular');
-      } catch (err) {
-        console.error('❌ Error guardando QR en PNG:', err);
-      }
+    const { qr, connection } = update;
+
+    if (qr) {
+      console.log('🔹 Generando QR...');
+      qrcode.generate(qr, { small: true });
     }
 
-    if (update.connection === 'open') {
+    if (connection === 'open') {
       console.log('✅ Conectado a WhatsApp!');
     }
-
-    if (update.connection === 'close') {
-      console.log('❌ Conexión cerrada:', update.lastDisconnect?.error || '');
-    }
   });
-
-  sock.ev.on('creds.update', saveCreds);
 }
 
-start();
+startTestQR();
