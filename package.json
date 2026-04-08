@@ -7,10 +7,24 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.6.0",
-    "axios": "^1.6.0",
-    "dotenv": "^16.0.0",
-    "mongoose": "^8.0.0",
+    "@whiskeysockets/baileys": "^6.7.21",
+    "axios": "^1.14.0",
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1",
+    "mongoose": "^8.23.0",
     "qrcode-terminal": "^0.12.0"
-  }
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maguikhichfe/botVentas.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/maguikhichfe/botVentas/issues"
+  },
+  "homepage": "https://github.com/maguikhichfe/botVentas#readme",
+  "description": ""
 }
