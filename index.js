@@ -157,14 +157,7 @@ async function conectar() {
 
  
 
-  sock.ev.on('connection.update', (update) => {
-    const { qr } = update
-  
-    if (qr) {
-      console.log('📲 ESCANEÁ ESTE QR:')
-      qrcode.generate(qr, { small: true })
-    }
-  })
+
 
 
 
