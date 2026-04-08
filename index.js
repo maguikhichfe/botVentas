@@ -147,6 +147,35 @@ function formatearCatalogo(items) {
     .join('\n\n');
 }
 
+async function conectar() {
+  const { state, saveCreds } = await useMultiFileAuthState('auth')
+
+  const sock = makeWASocket({
+    auth: state
+  })
+
+  sock.ev.on('creds.update', saveCreds)
+
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect, qr } = update
+
+    if (qr) {
+      qrcode.generate(qr, { small: true })
+    }
+
+    if (connection === 'close') {
+      console.log('❌ Conexión cerrada, reconectando...')
+      conectar() // ahora sí existe
+    }
+
+    if (connection === 'open') {
+      console.log('✅ Conectado a WhatsApp')
+    }
+  })
+}
+
+conectar()
+
 // ===============================
 // 🚀 BOT
 // ===============================
