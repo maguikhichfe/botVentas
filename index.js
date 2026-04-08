@@ -193,7 +193,7 @@ async function startBot() {
   
     if (connection === "close") {
       console.log("❌ Conexión cerrada, reconectando...")
-      conectar() // tu función
+      startBot() // tu función
     }
   })
   sock.ev.on('creds.update', saveCreds);
