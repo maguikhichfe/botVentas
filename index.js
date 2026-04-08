@@ -157,22 +157,13 @@ async function conectar() {
   sock.ev.on('creds.update', saveCreds)
 
   sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect, qr } = update
-
+    const { qr } = update
+  
     if (qr) {
+      console.log('📲 ESCANEÁ ESTE QR:')
       qrcode.generate(qr, { small: true })
     }
-
-    if (connection === 'close') {
-      console.log('❌ Conexión cerrada, reconectando...')
-      conectar() // ahora sí existe
-    }
-
-    if (connection === 'open') {
-      console.log('✅ Conectado a WhatsApp')
-    }
   })
-}
 
 conectar()
 
