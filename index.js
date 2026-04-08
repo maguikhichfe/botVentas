@@ -1,5 +1,4 @@
 import express from "express";
-import twilio from "twilio";
 
 const app = express();
 app.use(express.urlencoded({ extended: false }));
