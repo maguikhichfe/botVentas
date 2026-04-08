@@ -148,24 +148,41 @@ function formatearCatalogo(items) {
 // ===============================
 // 🚀 BOT
 // ===============================
+
+const QRCode = require('qrcode');
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('auth');
   const sock = makeWASocket({
     auth: state,
     browser: ['Ubuntu', 'Chrome', '20.0.04'],
-    printQRInTerminal: true,
     syncFullHistory: false,
     markOnlineOnConnect: false
   });
 
-  sock.ev.on('connection.update', (update) => {
-    const { qr } = update;
+  sock.ev.on('connection.update', async (update) => {
+    const { qr, connection, lastDisconnect } = update;
+
+    // Generar QR como PNG
     if (qr) {
-      qrcode.generate(qr, { small: true });
+      try {
+        await QRCode.toFile('qr.png', qr, { width: 300 });
+        console.log('✅ QR generado en qr.png. Escanealo con WhatsApp.');
+      } catch (err) {
+        console.error('Error generando QR:', err);
+      }
+    }
+
+    // Mensajes de conexión
+    if (connection === 'open') {
+      console.log('🟢 Conectado a WhatsApp correctamente');
+    }
+    if (connection === 'close') {
+      console.log('🔴 Conexión cerrada', lastDisconnect?.error);
     }
   });
 
   sock.ev.on('creds.update', saveCreds);
+
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
