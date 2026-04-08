@@ -8,8 +8,8 @@ import fs from 'fs'
 
 console.log('📁 auth existe:', fs.existsSync('./auth'));
 console.log('📁 creds existe:', fs.existsSync('./auth/creds.json'));
-const axios = require('axios');
-const makeWASocket = require('@whiskeysockets/baileys').default;
+import axios from 'axios'
+import makeWASocket from "@whiskeysockets/baileys"
 const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
 
 // ===============================
