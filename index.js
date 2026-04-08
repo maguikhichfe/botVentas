@@ -4,7 +4,7 @@
 // ===============================
 import qrcode from "qrcode-terminal"
 import 'dotenv/config'
-const fs = require('fs');
+import fs from 'fs'
 
 console.log('📁 auth existe:', fs.existsSync('./auth'));
 console.log('📁 creds existe:', fs.existsSync('./auth/creds.json'));
