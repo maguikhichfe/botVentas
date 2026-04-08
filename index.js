@@ -149,7 +149,7 @@ function formatearCatalogo(items) {
 // 🚀 BOT
 // ===============================
 
-const QRCode = require('qrcode');
+
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('auth');
   const sock = makeWASocket({
@@ -158,11 +158,10 @@ async function startBot() {
     syncFullHistory: false,
     markOnlineOnConnect: false
   });
-
+  const QRCode = require('qrcode');
   sock.ev.on('connection.update', async (update) => {
     const { qr, connection, lastDisconnect } = update;
-
-    // Generar QR como PNG
+  
     if (qr) {
       try {
         await QRCode.toFile('qr.png', qr, { width: 300 });
@@ -171,8 +170,7 @@ async function startBot() {
         console.error('Error generando QR:', err);
       }
     }
-
-    // Mensajes de conexión
+  
     if (connection === 'open') {
       console.log('🟢 Conectado a WhatsApp correctamente');
     }
