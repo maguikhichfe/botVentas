@@ -1,28 +1,52 @@
-// testQR.js
-const qrcode = require('qrcode-terminal');
-const makeWASocket = require('@whiskeysockets/baileys').default;
-const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
+// index.js
+import makeWASocket, { useSingleFileAuthState, DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
+import { Boom } from '@hapi/boom';
+import fs from 'fs';
 
-async function startTestQR() {
-  const { state, saveCreds } = await useMultiFileAuthState('auth');
+const { state, saveState } = useSingleFileAuthState('./auth_info.json');
 
-  const sock = makeWASocket({
-    auth: state,
-    browser: ['Ubuntu', 'Chrome', '20.0.04'],
-    printQRInTerminal: true
-  });
+async function startWhatsApp() {
+    // Obtener la última versión de WhatsApp Web
+    const { version, isLatest } = await fetchLatestBaileysVersion();
+    console.log(`Usando WhatsApp Web v${version.join('.')}, ¿es la última?: ${isLatest}`);
 
-  sock.ev.on('connection.update', (update) => {
-    if (update.qr) {
-      console.log('📲 QR generado:');
-      qrcode.generate(update.qr, { small: true });
-    }
-    if (update.connection) {
-      console.log('🔗 Conexión:', update.connection);
-    }
-  });
+    const conn = makeWASocket({
+        version,
+        printQRInTerminal: false, // deprecated, no se usa
+        auth: state,
+        browser: ['BotVentas', 'NodeJS', '1.0']
+    });
 
-  sock.ev.on('creds.update', saveCreds);
+    // Guardar cambios de autenticación
+    conn.ev.on('creds.update', saveState);
+
+    // Manejo de conexión
+    conn.ev.on('connection.update', update => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr) {
+            console.log('📷 Escanea este QR con tu WhatsApp:');
+            console.log(qr); // puedes usar una librería para mostrarlo como imagen en consola
+        }
+
+        if (connection === 'open') {
+            console.log('✅ Conectado a WhatsApp!');
+        }
+
+        if (connection === 'close') {
+            const reason = (lastDisconnect?.error as Boom)?.output?.statusCode;
+            console.log('❌ Conexión cerrada, código:', reason);
+            // Reintento automático
+            if (reason !== DisconnectReason.loggedOut) {
+                startWhatsApp();
+            }
+        }
+    });
+
+    // Ejemplo de recibir mensajes
+    conn.ev.on('messages.upsert', m => {
+        console.log('📩 Mensaje recibido:', m);
+    });
 }
 
-startTestQR().catch(err => console.error(err));
+startWhatsApp();
