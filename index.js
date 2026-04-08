@@ -159,9 +159,20 @@ async function startBot() {
   });
 
   sock.ev.on('connection.update', (update) => {
-    const { qr } = update;
+    const { connection, lastDisconnect, qr } = update;
+  
     if (qr) {
+      console.log('📲 Escaneá este QR:');
       qrcode.generate(qr, { small: true });
+    }
+  
+    if (connection === 'close') {
+      console.log('❌ Conexión cerrada, reconectando...');
+  
+      // 🔁 vuelve a iniciar el bot automáticamente
+      startBot();
+    } else if (connection === 'open') {
+      console.log('✅ BOT CONECTADO Y LISTO');
     }
   });
 
