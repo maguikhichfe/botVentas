@@ -2,7 +2,7 @@
 // 📦 WhatsApp Bot de Ventas
 // Stack: Node.js + Baileys
 // ===============================
-
+import qrcode from "qrcode-terminal"
 require('dotenv').config();
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
@@ -161,25 +161,21 @@ async function startBot() {
     markOnlineOnConnect: false
   });
 
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect, qr } = update;
-    console.log("📡 Estado conexión:", update)
-  
+  sock.ev.on("connection.update", ({ connection, qr }) => {
     if (qr) {
-      console.log('📲 Escaneá este QR:');
-      qrcode.generate(qr, { small: true });
+      console.log("📱 ESCANEÁ ESTE QR:")
+      qrcode.generate(qr, { small: true })
     }
   
-    if (connection === 'close') {
-      console.log('❌ Conexión cerrada, reconectando...');
-  
-      // 🔁 vuelve a iniciar el bot automáticamente
-      startBot();
-    } else if (connection === 'open') {
-      console.log('✅ BOT CONECTADO Y LISTO');
+    if (connection === "open") {
+      console.log("✅ CONECTADO")
     }
-  });
-
+  
+    if (connection === "close") {
+      console.log("❌ Conexión cerrada, reconectando...")
+      conectar() // tu función
+    }
+  })
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
