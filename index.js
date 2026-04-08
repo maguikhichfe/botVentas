@@ -166,7 +166,7 @@ async function conectar() {
     }
   })
 
-conectar()
+
 
 // ===============================
 // 🚀 BOT
