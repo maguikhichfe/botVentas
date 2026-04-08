@@ -6,6 +6,9 @@
 require('dotenv').config();
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
+
+console.log('📁 auth existe:', fs.existsSync('./auth'));
+console.log('📁 creds existe:', fs.existsSync('./auth/creds.json'));
 const axios = require('axios');
 const makeWASocket = require('@whiskeysockets/baileys').default;
 const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
